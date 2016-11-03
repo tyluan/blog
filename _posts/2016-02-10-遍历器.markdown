@@ -25,6 +25,13 @@ Iterator的作用有三个：一是为各种数据结构，提供一个统一的
 > 下面就重点说说我是如何遍历这些集合的
 
 ### forEach
-接触最早，一些后端同学喜欢用，但是IE8不兼容！！可以遍历数组。如	
+接触最早，一些后端同学喜欢用，可以遍历数组。如	
+  ```hbs
+  var myArray = [1,2,3];
+  myArray.forEach(function(val,index){
+  	...
+  })
+  ```
+这种写法问题是，IE8不兼容，且无法中途跳出循环，break、return是无法使用的
 
-`var myArray = [1,2,3];myArray.forEach(function(val,index){...})`
+### for...in
