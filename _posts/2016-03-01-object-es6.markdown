@@ -1,0 +1,27 @@
+---
+layout:     post
+title:      "对象属性的可枚举性，不可枚举性"
+subtitle:   "枚举"
+date:       2016-03-01 12:00:00
+author:     "jun"
+header-img: "img/post-bg-re-vs-ng2.jpg"
+header-mask: 0.3
+catalog:    true
+tags:
+    - 前端开发
+    - JavaScript
+    - 枚举
+    - es6
+ 
+---
+
+> 接上篇，for...in只能循环可枚举属性，Object.keys就更不用说了，原型内属性都不能循环出来，那什么是不可枚举，枚举有什么用呢
+#什么是可枚举
+ 在JavaScript中，对象的属性分为可枚举和不可枚举之分，它们是由属性的enumerable值决定的。
+#枚举性对什么有影响
+for...in Object.keys()等都是选择不可枚举对象
+
+
+
+
+> 本文参考[博客园](http://www.cnblogs.com/kongxy/p/4618173.html)
