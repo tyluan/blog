@@ -1,0 +1,89 @@
+---
+layout:     post
+title:      "js异步方法总结"
+subtitle:   "异步"
+date:       2016-04-01 12:00:00
+author:     "jun"
+header-img: "img/post-bg-re-vs-ng2.jpg"
+header-mask: 0.3
+catalog:    true
+tags:
+    - 前端开发
+    - JavaScript
+    - 异步
+    - promise
+ 
+---
+
+#JS中异步编程
+> Javascript语言的执行环境是"单线程",这种模式的好处是实现起来比较简单，执行环境相对单纯；坏处是只要有一个任务耗时很长，后面的任务都必须排队等着，会拖延整个程序的执行。为了解决这个问题，Javascript语言将任务的执行模式分成两种：同步（Synchronous）和异步（Asynchronous）。本文主要介绍es6中异步编程：Generators函数+Promise
+
+js没有多线程的概念，只有阻塞的概念，我们说的异步，是只不阻塞后续代码。目前主要有两种编程方式回调函数和事件监听，阮一峰的[Javascript异步编程的4种方法](http://www.ruanyifeng.com/blog/2012/12/asynchronous%EF%BC%BFjavascript.html)基本是这两种。
+## 一、回调函数
+异步编程最基本的方法。
+
+回调是一个函数被作为一个参数传递到另一个函数里，在那个函数执行完后再执行。不过回调并不一定就是异步。他们自己并没有直接关系。
+同步回调：
+
+	function A(callback){
+	    console.log("I am A");
+	    callback();  //调用该函数
+	}
+
+	function B(){
+	   console.log("I am B");
+	}
+
+	A(B);
+
+### setTimeout异步回调
+
+函数f1,f2,f3，f1是耗时操作，f2需在f1之后执行，f3和f1,f2关系不大。
+
+	f1();
+	f2();
+	f3();
+
+上面同步操作f1会阻塞f3执行。改成setTimeout回调模式执行，例如
+
+	function f1(n){
+    	if(n==1||n==2){
+	        return 1;
+	    }
+    	return f1(n-1)+f1(n-2);
+	};
+	function f2(){
+		console.log('done')
+	};
+	function f3(){
+		console.log('hello')
+	}
+	
+	//回调模式
+	function _f1(callback){
+		setTimeout(function(){
+			f1(43);
+			callback();
+		},1000)
+	}
+执行
+
+	_f1(f2);
+	f3();
+
+###ajax异步回调
+	var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);   //第三个参数决定是否采用异步的方式
+    xhr.send(data);
+    xhr.onreadystatechange = function(){
+        if(xhr.readystate === 4 && xhr.status === 200){
+                ///xxxx
+        }
+    }
+浏览器在发起一个ajax请求，会单开一个线程（这是因为浏览器是多进程）去发起http请求，这样的话就能把这个耗时的过程单独去自己跑了，在这个线程的请求过程中，readystate 的值会有个变化的过程，每一次变化就触发一次onreadystatechange 函数，进行判断是否正确拿到返回结果。
+
+回调函数的优点是简单，轻量级（不需要额外的库）。缺点是各个部分之间高度耦合，流程会很混乱，而且每个任务只能指定一个回调函数。某个操作需要经过多个非阻塞的IO操作，每一个结果都是通过回调，产生意大利面条式的代码
+
+## 二、事件监听
+另一种异步是采用事件驱动模式。任务的执行不取决于代码的顺序，而取决于某个事件是否发生。
+
