@@ -1,0 +1,117 @@
+---
+layout:     post
+title:      "浏览器缓存机制"
+subtitle:   "缓存"
+date:       2017-01-03 12:00:00
+author:     "jun"
+header-img: "img/post-bg-re-vs-ng2.jpg"
+header-mask: 0.3
+catalog:    true
+tags:
+    - 前端开发
+    - JavaScript
+    - 缓存
+
+---
+
+> 本文是在公司内部分校文章
+
+
+# 浏览器缓存机制
+
+>浏览器缓存根据一套与服务器约定的规则进行工作，在同一个会话过程中会检查一次并确定缓存的副本足够新。如果你浏览过程中，比如前进或后退，访问到同一个图片，这些图片可以从浏览器缓存中调出而即时显现。
+
+缓存可以减少网络带宽消耗  * 降低服务器压力  * 减少网络延迟，加快页面打开速度
+
+主要讨论一下问题：
+
+1. 浏览器是如何判断缓存是否过期？
+
+2. 服务端如何判断缓存已失效？
+
+3. 为什么有了Last-Modified还要Etag？
+
+4. 200 OK( from cache )和 304 Not Modified的区别？
+
+
+
+## 浏览器端的缓存规则
+
+对于浏览器端的缓存来讲，这些规则是在HTTP协议头和HTML页面的Meta标签中定义的。他们分别从新鲜度和校验值两个维度来规定浏览器是否可以直接使用缓存中的副本，还是需要去源服务器获取更新的版本。
+
+新鲜度（过期机制）：一个缓存副本必须满足以下条件，浏览器会认为它是有效的，足够新的：
+
+	* 含有完整的过期时间控制头信息（HTTP协议报头），并且仍在有效期内；
+	* 浏览器已经使用过这个缓存副本，并且在一个会话中已经检查过新鲜度
+ 
+满足以上两个情况的一种，浏览器会直接从缓存中获取副本并渲染。
+
+校验值（验证机制）：服务器返回资源的时候有时在控制头信息带上这个资源的实体标签Etag（Entity Tag），它可以用来作为浏览器再次请求过程的校验标识。如过发现校验标识不匹配，说明资源已经被修改或过期，浏览器需求重新获取资源内容。
+
+
+## Expires与Cache-Control
+
+Expires和Cache-Control就是服务端用来约定和客户端的有效时间的。
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/cache-control.png)
+
+比如如上分校系统一个响应头，Expires规定了缓存失效时间（Date为当前时间），而Cache-Control的max-age规定了缓存有效时间（21600s），理论上这两个值计算出的有效时间应该是相同的。Expires是HTTP1.0的东西，而Cache-Control是HTTP1.1的，规定如果max-age和Expires同时存在，前者优先级高于后者。
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/control.png)
+
+## Last-Modified/If-Modified-Since
+
+
+而Last-Modified/If-Modified-Since就是上面说的当有效期过后，check服务端文件是否更新的第一种方式，要配合Cache-Control使用。比如第一次访问页面请求一个jquery文件，响应头返回如下信息：
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/cache_modify.png)
+
+然后按下F5（ctrl+r）刷新，F5会默认跳过max-age和Expires的检验直接去向服务器发送请求，我们看看请求截图：
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/cache_since.png)
+
+请求头中包含了If-Modified-Since项，而它的值和上次请求响应头中的Last-Modified一致，这个日期是在2013年，也就是说这个文件自从2013年的那个日期后就没有再被修改过了。将If-Modified-Since的日期和服务端该文件的最后修改日期对比，如果相同，则响应HTTP304，从缓存读数据；如果不相同文件更新了，HTTP200，返回数据，同时通过响应头更新last-Modified的值（以备下次对比）。
+
+## ETag/If-None-Match
+
+ETag并不是文件的版本号，而是一串可以代表该文件唯一的字符串。当客户端发现和服务器约定的直接读取缓存的时间过了，就在请求中发送If-None-Match选项，值即为上次请求后响应头的ETag值，该值在服务端和服务端代表该文件唯一的字符串对比（如果服务端该文件改变了，该值就会变），如果相同，则相应HTTP304，客户端直接读取缓存，如果不相同，HTTP200，下载正确的数据，更新ETag值。看如上截图，与服务器约定的直接读取本地缓存的时间过了，就会向服务器发送新的请求，请求头中带If-None-Match项，该字符串值会在服务端进行匹配，很显然，并没有什么变化（看响应头的ETag值），于是响应HTTP304，直接读取缓存。或许你会发送该请求也有If-Modified-Since项，如果两者同时存在，If-None-Match优先，忽略If-Modified-Since。
+:![](http://172.16.117.224/fe/blog/raw/master/img/cache_etag.png)
+
+TTP1.1中ETag的出现主要是为了解决几个Last-Modified比较难解决的问题：
+
+ * Last-Modified标注的最后修改只能精确到秒级，如果某些文件在1秒钟以内，被修改多次的话，它将不能准确标注文件的修改时间;
+ * 如果某些文件会被定期生成，但有时内容并没有任何变化（仅仅改变了时间），但Last-Modified却改变了，导致文件没法使用缓存;
+ * 有可能存在服务器没有准确获取文件修改时间，或者与代理服务器时间不一致等情形
+
+
+## 不能缓存的请求
+
+当然并不是所有请求都能被缓存。
+
+无法被浏览器缓存的请求：
+ 
+* HTTP信息头中包含Cache-Control:no-cache，pragma:no-cache（HTTP1.0），或Cache-Control:max-age=0等告诉浏览器不用缓存的请求;
+* 需要根据Cookie，认证信息等决定输入内容的动态请求是不能被缓存的;
+* 经过HTTPS安全加密的请求;
+* POST请求无法被缓存;
+* HTTP响应头中不包含Last-Modified/Etag，也不包含Cache-Control/Expires的请求无法被缓存
+
+## 用户行为与缓存
+
+浏览器缓存过程还和用户行为有关，譬如上面提到的，，有个jquery的请求，如果直接在地址栏按回车，响应HTTP200（from cache），因为有效期还没过直接读取的缓存；如果ctrl+r进行刷新，则会相应HTTP304（Not Modified），虽然还是读取的本地缓存，但是多了一次服务端的请求；而如果是ctrl+shift+r强刷，则会直接从服务器下载新的文件，响应HTTP200。
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/control_user.png)
+
+通过上表我们可以看到，当用户在按F5进行刷新的时候，会忽略Expires/Cache-Control的设置，会再次发送请求去服务器请求，而Last-Modified/Etag还是有效的，服务器会根据情况判断返回304还是200；而当用户使用Ctrl+F5进行强制刷新的时候，只是所有的缓存机制都将失效，重新从服务器拉去资源。
+
+## 总结
+
+:![](http://172.16.117.224/fe/blog/raw/master/img/control_main.png)
+
+##我们怎么做
+
+页面添加meta
+	<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+
+单页面应用的话，解决方案就很简单了，修改index.js后面的版本号
+
